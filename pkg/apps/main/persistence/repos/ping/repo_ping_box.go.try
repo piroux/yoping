@@ -1,3 +1,4 @@
+/*
 package repo_ping
 
 import (
@@ -18,7 +19,6 @@ type RepoBox struct {
 	pingBox *objectbox.Box
 }
 
-/*
 
 func NewRepoBox(ob *objectbox.ObjectBox) *RepoBox {
 	pingBox := ob.Box(PingEntity{}) // Pass the entity type to create a box

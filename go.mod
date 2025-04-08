@@ -13,7 +13,6 @@ require (
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/jackc/pgx/v5 v5.7.2
 	github.com/nyaruka/phonenumbers v1.3.6
-	github.com/objectbox/objectbox-go v1.9.0
 	github.com/stretchr/testify v1.9.0
 )
 
@@ -51,7 +50,6 @@ require (
 	github.com/go-sql-driver/mysql v1.8.1 // indirect
 	github.com/google/btree v1.1.2 // indirect
 	github.com/google/cel-go v0.22.1 // indirect
-	github.com/google/flatbuffers v23.5.26+incompatible // indirect
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510 // indirect
 	github.com/gorilla/css v1.0.0 // indirect
 	github.com/gosimple/slug v1.13.1 // indirect
@@ -81,7 +79,6 @@ require (
 	github.com/muesli/reflow v0.3.0 // indirect
 	github.com/muesli/termenv v0.13.0 // indirect
 	github.com/ncruces/go-strftime v0.1.9 // indirect
-	github.com/objectbox/objectbox-generator/v4 v4.0.0 // indirect
 	github.com/olekukonko/tablewriter v0.0.5 // indirect
 	github.com/pb33f/libopenapi v0.9.7 // indirect
 	github.com/pelletier/go-toml v1.9.5 // indirect
