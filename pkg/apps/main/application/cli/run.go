@@ -136,7 +136,7 @@ func Run() {
 	// Register GET /greeting/{name}
 	huma.Register(api, huma.Operation{
 		OperationID: "ping-ex",
-		Method:      http.MethodGet,
+		Method:      http.MethodPost,
 		//Path:        "/users/:phoneFrom/ping/:phone",
 		Path:        "/ping/ex/{phoneFrom}/{phoneTo}",
 		Summary:     "Send a Ping",

@@ -23,6 +23,6 @@ var _ adapters.PingNotifier = &NotifierMegaring{}
 
 func (ntf *NotifierMegaring) Notify(ping models.Ping) error {
 	pingDebug := (&spew.ConfigState{}).Sdump(ping)
-	slog.Info("notify for ping", slog.String("ping", pingDebug))
+	slog.Info("notify on Megaring", slog.String("ping", pingDebug))
 	return nil
 }

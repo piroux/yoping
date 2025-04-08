@@ -29,7 +29,7 @@ func NewPing(fromPhoneNumber, toPhoneNumber string) (*Ping, error) {
 
 	pnPair, err := NewPhoneNumberPair(fromPhoneNumber, toPhoneNumber)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create Ping: failed to create PhoneNumberPair for Ping:%w", err)
+		return nil, fmt.Errorf("failed to create Ping: failed to create PhoneNumberPair for Ping: %w", err)
 	}
 
 	m := &Ping{

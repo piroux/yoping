@@ -20,7 +20,7 @@ tasks:
 
   db-inspect:
     cmds:
-      - docker compose run --rm --force-recreate --no-deps db-shell
+      - docker compose run --rm --no-deps db-shell
 
   api-backend-run:
     cmds:

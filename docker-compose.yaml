@@ -139,7 +139,6 @@ services:
       DB_URL: "postgresql://${DB_USERNAME:?}:${DB_PASSWORD:?}@db:5432/${DB_DATABASE:?}"
     networks:
       yoping:
-      default:
     ports:
       - "127.0.0.1:8855:8855/tcp"
     depends_on:
@@ -170,17 +169,17 @@ services:
         WORKDIR /devel/src
         RUN go install github.com/danielgtaylor/restish@v0.20.0
         #
-        FROM gcr.io/distroless/static-debian12:debug
+        #FROM gcr.io/distroless/static-debian12:debug
+        FROM debian:bookworm-slim
         WORKDIR /app
+        RUN apt update && apt install bash && apt clean;
         COPY --from=builder /go/bin/restish /app/restish
         ENTRYPOINT ["/app/restish"]
-    entrypoint: ["sh"]
-    command: | ## TODO: script to fetch OpenAPI spec from api-backend and sync client
-      -c '
-        set -x;
-        /app/restish get :8855/ping/ex/+33600000001/+33600000003;
-        /app/restish get :8855/ping/in/+33600000001/+33600000003;
-      '
+    entrypoint: ["bash"]
+    ## TODO: script to fetch OpenAPI spec from api-backend and sync client
+    command: ["/app/api-client-test.sh"]
+    volumes:
+      - ./api-client-test.sh:/app/api-client-test.sh:ro
     networks:
       yoping:
     ports:
@@ -205,4 +204,3 @@ volumes:
 
 networks:
   yoping:
-  default:
