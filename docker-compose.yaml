@@ -1,0 +1,208 @@
+name: yoping
+
+
+services:
+
+  db:
+    image: postgres:17.4
+    environment:
+      POSTGRES_DB: ${DB_DATABASE:?}
+      POSTGRES_USER: ${DB_USERNAME:?}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?}
+    volumes:
+      - db-postgres-data:/data
+    networks:
+      yoping:
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 0
+      start_period: 10s
+    restart: "no"
+    stop_grace_period: 5s
+
+  db-setup:
+    build:
+      dockerfile_inline: |
+        FROM arigaio/atlas:0.32.0-community-alpine
+        RUN apk add postgresql-client
+    entrypoint: ["sh"]
+    command: |
+      -c '
+        set -xe;
+        echo "db:5432:*:${DB_USERNAME}:${DB_PASSWORD}" > ~/.pgpass
+        chmod -v 600 ~/.pgpass;
+        export PGPASSFILE=$(readlink -f ~/.pgpass);
+        dropdb --echo --force --if-exists --host=db --port=5432 --no-password ${DB_DATABASE}-dev;
+        createdb --echo --host=db --port=5432 --no-password ${DB_DATABASE}-dev;
+        psql "postgresql://root:${DB_PASSWORD}@db:5432/${DB_DATABASE}?sslmode=disable" -c "\dt";
+        export ATLAS_NO_UPGRADE_SUGGESTIONS=1;
+        atlas schema clean \
+          --auto-approve \
+          --url "postgresql://${DB_USERNAME}:${DB_PASSWORD}@db:5432/${DB_DATABASE}?sslmode=disable" \
+          ;
+        atlas schema diff \
+          --from "postgresql://${DB_USERNAME}:${DB_PASSWORD}@db:5432/${DB_DATABASE}?sslmode=disable" \
+          --to file:///schemas/schema.sql \
+          --dev-url "postgresql://root:${DB_PASSWORD}@db:5432/${DB_DATABASE}-dev?sslmode=disable" \
+          ;
+        atlas schema apply \
+          --auto-approve \
+          --url "postgresql://${DB_USERNAME}:${DB_PASSWORD}@db:5432/${DB_DATABASE}?sslmode=disable" \
+          --to file:///schemas/schema.sql \
+          --dev-url "postgresql://root:${DB_PASSWORD}@db:5432/${DB_DATABASE}-dev?sslmode=disable" \
+          ;
+        atlas schema diff \
+          --from "postgresql://${DB_USERNAME}:${DB_PASSWORD}@db:5432/${DB_DATABASE}?sslmode=disable" \
+          --to file:///schemas/schema.sql \
+          --dev-url "postgresql://root:${DB_PASSWORD}@db:5432/${DB_DATABASE}-dev?sslmode=disable" \
+          ;
+        psql "postgresql://root:${DB_PASSWORD}@db:5432/${DB_DATABASE}?sslmode=disable" -c "\dt";
+      '
+    #    --dev-url "docker://postgresql/8/example"
+    environment:
+      DB_USERNAME: ${DB_USERNAME:?}
+      DB_PASSWORD: ${DB_PASSWORD:?}
+      DB_DATABASE: ${DB_DATABASE:?}
+    volumes:
+      - ./pkg/apps/main/persistence/storage/gensql/gen_sql_src/schema.sql:/schemas/schema.sql:ro
+    networks:
+      yoping:
+    depends_on:
+      db:
+        condition: service_healthy
+        restart: false
+    restart: "no"
+    stop_grace_period: 0s
+
+  db-shell-basic:
+    image: postgres:17.4
+    entrypoint: ["psql"]
+    command: ["postgresql://${DB_USERNAME}:yoping@db:5432/"]
+    networks:
+      yoping:
+    depends_on:
+      db:
+        condition: service_healthy
+    tty: true
+    stdin_open: true
+    restart: "no"
+    stop_grace_period: 0s
+
+  db-shell:
+    build:
+      dockerfile_inline: |
+        FROM python:3.12
+        RUN pip install pgcli
+    entrypoint: ["pgcli"]
+    command: ["postgresql://${DB_USERNAME}:${DB_PASSWORD}@db:5432/${DB_DATABASE}"]
+    environment:
+      DB_USERNAME: ${DB_USERNAME:?}
+      DB_PASSWORD: ${DB_PASSWORD:?}
+      DB_DATABASE: ${DB_DATABASE:?}
+    networks:
+      yoping:
+    depends_on:
+      db:
+        condition: service_healthy
+        restart: false
+    tty: true
+    stdin_open: true
+    logging:
+      driver: none
+    restart: "no"
+    stop_grace_period: 0s
+
+  api-backend:
+    image: piroux.dev/yoping/api-backend
+    build:
+      context: .
+      dockerfile_inline: |
+        FROM golang:1.24.1 AS builder
+        ENV CGO_ENABLED=0
+        ENV GODEBUG=installgoroot=all
+        RUN mkdir -vp /devel/src /devel/build
+        WORKDIR /devel/src
+        RUN go build std
+        COPY go.mod go.sum /devel/src
+        RUN go mod download -x
+        COPY . /devel/src
+        RUN go build -v -o /devel/build/yoping-api-backend ./cmd/yoping-api-backend
+        #
+        #FROM scratch
+        FROM gcr.io/distroless/static-debian12
+        WORKDIR /app
+        COPY --from=builder /devel/build/yoping-api-backend /app/yoping-api-backend
+        ENTRYPOINT ["/app/yoping-api-backend"]
+    environment:
+      DB_URL: "postgresql://${DB_USERNAME:?}:${DB_PASSWORD:?}@db:5432/${DB_DATABASE:?}"
+    networks:
+      yoping:
+      default:
+    ports:
+      - "127.0.0.1:8855:8855/tcp"
+    depends_on:
+      db:
+        condition: service_healthy
+        restart: true
+      db-setup:
+        condition: service_completed_successfully
+        restart: false
+    develop:
+      watch:
+        - action: rebuild
+          path: .
+          #include: "*.go"
+    tty: true
+    restart: unless-stopped
+    stop_grace_period: 3s
+
+  api-client:
+    image: piroux.dev/yoping/api-client
+    build:
+      context: .
+      dockerfile_inline: |
+        FROM golang:1.24.1 AS builder
+        ENV CGO_ENABLED=0
+        ENV GODEBUG=installgoroot=all
+        RUN mkdir -vp /devel/src /devel/build
+        WORKDIR /devel/src
+        RUN go install github.com/danielgtaylor/restish@v0.20.0
+        #
+        FROM gcr.io/distroless/static-debian12:debug
+        WORKDIR /app
+        COPY --from=builder /go/bin/restish /app/restish
+        ENTRYPOINT ["/app/restish"]
+    entrypoint: ["sh"]
+    command: | ## TODO: script to fetch OpenAPI spec from api-backend and sync client
+      -c '
+        set -x;
+        /app/restish get :8855/ping/ex/+33600000001/+33600000003;
+        /app/restish get :8855/ping/in/+33600000001/+33600000003;
+      '
+    networks:
+      yoping:
+    ports:
+      - "8855:8855/tcp"
+    depends_on:
+      api-backend:
+        condition: service_healthy
+        restart: false
+    develop:
+      watch:
+        - action: rebuild
+          path: .
+          #include: "*.go"
+    tty: true
+    restart: unless-stopped
+    stop_grace_period: 3s
+
+
+volumes:
+  db-postgres-data:
+
+
+networks:
+  yoping:
+  default:

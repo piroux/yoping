@@ -1,0 +1,46 @@
+services:
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    ports:
+      - target: 8055
+        published: 8055
+        mode: ingress
+    environment:
+      DATABASE_URL: postgresql://yoping:yoping@db:5432/yopingdb
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      yoping:
+    restart: "no"
+    profiles:
+      - api
+
+  # docker run --rm -it arigaio/atlas schema apply
+  # -u postgres://postgres:mysecretpassword@some-postgres:5432/yoping
+  # --to pkg/apps/main/persistence/storage/gensql/gen_sql_src/schema.sql --dry-run
+  db-setup-old:
+    image: arigaio/atlas:latest
+    command: |
+      # TODO: ${DB_DATABASE}-dev
+      schema
+      apply
+      --url postgresql://${DB_USERNAME}:${DB_PASSWORD}@db:5432/${DB_DATABASE}?sslmode=disable
+      --to file://schemas/schema.sql
+      --dev-url postgresql://${DB_USERNAME}:${DB_PASSWORD}@db:5432/${DB_DATABASE}-dev?sslmode=disable
+      --dry-run
+    environment:
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_DATABASE: ${DB_DATABASE}
+    volumes:
+      - ./pkg/apps/main/persistence/storage/gensql/gen_sql_src:/schemas:ro
+    networks:
+      yoping:
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"

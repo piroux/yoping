@@ -1,0 +1,14 @@
+{
+    "version": "2",
+    "sql": [{
+      "schema": "gen_sql_src/schema.sql",
+      "queries": "gen_sql_src/queries.sql",
+      "engine": "postgresql",
+      "gen": {
+        "go": {
+          "out": "gen_sql_dst",
+          "sql_package": "pgx/v5"
+        }
+      }
+    }]
+  }
